@@ -90,9 +90,12 @@ n = datetime.now(timezone.utc)
 d = n.astimezone(ZoneInfo('Australia/Perth')).utcoffset() - n.astimezone(ZoneInfo('Europe/Dublin')).utcoffset()
 print(int(d.total_seconds() // 60))")
 adbsh cmd alarm set-timezone Etc/UTC >/dev/null # start elsewhere so the first switch really changes the zone
-sleep 3
 gaps=() bands=() evidence="" ok=1
 for tz in Australia/Perth Europe/Dublin America/New_York; do
+    # Each switch sends TIMEZONE_CHANGED to every app that listens for it, cold-starting them
+    # one by one. Drain the previous switch's backlog first, so the 10 s bound times our
+    # refresh and not other apps' receivers.
+    timeout 120 adb shell am wait-for-broadcast-idle >/dev/null 2>&1 || sleep 15
     adb logcat -c
     adbsh cmd alarm set-timezone "$tz" >/dev/null
     if line=$(wait_log 'refresh\[(TIMEZONE_CHANGED|TIME_SET)\]' 10); then

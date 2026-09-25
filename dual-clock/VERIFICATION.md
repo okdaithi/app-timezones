@@ -1,27 +1,28 @@
 # Verification: SPEC §8 acceptance criteria
 
-Status on 2026-09-25, commit introducing `dual-clock/`.
+Status on 2026-09-25. CI results are from [run 36142041579](https://github.com/okdaithi/app-timezones/actions/runs/36142041579) on commit `b344e08` (API 34 emulator).
 
 **Environment limits.** The authoring container could not reach `dl.google.com` or `maven.google.com`, so it had no Android SDK, no AndroidX artifacts and no KVM. As a result:
 - Only `:core` was compiled and tested locally.
-- `:app` was written against Glance 1.1.1, Compose BOM 2024.12.01 and AGP 8.7.3, but has **not been compiled yet**. The `build` job in `.github/workflows/dual-clock.yml` is its first compile.
+- `:app` targets Glance 1.1.1, Compose BOM 2024.12.01 and AGP 8.7.3. It compiles in CI (`build` job).
 - The emulator criteria are automated in `scripts/emulator-checks.sh` and run by the `emulator` CI job (API 34, google_apis, x86_64). That job publishes a results table to the run summary and as the `emulator-results` artifact.
 
 | # | Criterion | Status | How |
 |---|---|---|---|
-| 1 | `:core` unit tests pass | **PASS** (local) | 14/14 `CallWindowTest` + 6/6 `ExplainTest`, JDK 21, Kotlin 2.1.21. CI: `./gradlew :core:test` |
+| 1 | `:core` unit tests pass | **PASS** (local + CI) | 14/14 `CallWindowTest` + 6/6 `ExplainTest` |
 | 2 | Digits tick with the app process killed | MANUAL | See below. CI has no launcher to render the TextClock |
-| 3 | Device zone switch leaves times and window unchanged; refresh within seconds | CI | `emulator-checks.sh` §3 |
-| 4 | 2026-10-25 01:00Z: Galway 01:5x IST → 01:0x GMT, window → 16:00–21:00 Perth | CI | §4 |
-| 5 | Status flips within ~1 min of 21:00 Perth | CI | §5 |
-| 6 | Band keeps updating after reboot without opening the app | CI | §6 |
-| 7 | Galway date line and "a day behind" change at 00:00 Galway | CI | §7 |
+| 3 | Device zone switch leaves times and window unchanged; refresh within seconds | **PASS** (CI) | Perth, Dublin and New York device zones all showed Perth 21:40 / Galway 14:40, `band=900..1259`, refresh < 10 s |
+| 4 | 2026-10-25 01:00Z: Galway 01:5x IST → 01:0x GMT, window → 16:00–21:00 Perth | **PASS** (CI) | `Galway 01:00 … Sun 25 Oct · GMT … band=960..1259`, status `Opens 16:00` |
+| 5 | Status flips within ~1 min of 21:00 Perth | **PASS** (CI) | Refresh at 21:00:02 Perth: `Too late in Perth. Opens 15:00.` |
+| 6 | Band keeps updating after reboot without opening the app | **PASS** (CI) | `refresh[BOOT_COMPLETED]`, one RTC alarm re-armed |
+| 7 | Galway date line and "a day behind" change at 00:00 Galway | **PASS** (CI) | Refresh at 00:00:16 Galway: `Sat 26 Sep · IST`, note gone |
 | 8 | Four sizes, no clipping at each bucket's minimum | MANUAL | See below |
 | 9 | TalkBack reads the F9 description | MANUAL | See below. CI logs the description string |
-| 10 | Settings change updates every placed widget | CI | `WidgetHostTest#settingsReachEveryWidget` |
-| 11 | No `systemDefault`/`getDefault()`/zone-less `now` outside tests | **PASS** (local) | `scripts/check-forbidden-apis.sh`, which also checks R3 (no exact or wake-up alarms, no WorkManager, `updatePeriodMillis=0`) and the permission list |
+| 10 | Settings change updates every placed widget | **PASS** (CI) | `WidgetHostTest#settingsReachEveryWidget` |
+| R3 | Exactly one pending alarm, `RTC` (type 1), never `RTC_WAKEUP` | **PASS** (CI) | `dumpsys alarm`: `RTC #16: Alarm{… type 1 … com.dg.dualclock}` |
+| 11 | No `systemDefault`/`getDefault()`/zone-less `now` outside tests | **PASS** (local + CI) | `scripts/check-forbidden-apis.sh`, which also checks R3 (no exact or wake-up alarms, no WorkManager, `updatePeriodMillis=0`) and the permission list |
 
-Replace "CI" with PASS or FAIL once the first `emulator` run completes.
+Criterion 3 failed once before commit `b344e08`. The Etc/UTC pre-switch's broadcast backlog delayed the next refresh. The script now waits for `am wait-for-broadcast-idle` before each switch.
 
 ## How the CI job observes the widget
 
