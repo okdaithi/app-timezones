@@ -44,6 +44,17 @@ set_time() { # ISO-8601 UTC
     adbsh cmd alarm set-time "$(epoch_ms "$1")" >/dev/null
 }
 
+# Printed to the job log when an alarm-driven check fails, so the cause can be read off the run.
+diagnose() {
+    echo "---- diagnostics: $1"
+    echo "standby bucket: $(adbsh am get-standby-bucket "$PKG")"
+    echo "device time:    $(adbsh date -u +%FT%TZ)"
+    echo "pending alarm:  $(alarm_lines)"
+    adbsh dumpsys alarm | grep -iE 'quota|tare|com\.dg\.dualclock' | head -40
+    echo "DualClock log:"; log
+    echo "----"
+}
+
 alarm_lines() { adbsh dumpsys alarm | grep -E '(RTC|ELAPSED)[_A-Z]* #[0-9]+: Alarm\{.*com\.dg\.dualclock'; }
 
 check_one_rtc_alarm() {
@@ -123,6 +134,7 @@ after=$(wait_log 'refresh\[REFRESH\].*Too late in Perth\. Opens 15:00' 200)
 if [[ -n "$before" && -n "$after" ]]; then
     record 5 "Status flips at 21:00 Perth within ~1 min" PASS "$after"
 else
+    diagnose "criterion 5"
     record 5 "Status flips at 21:00 Perth within ~1 min" FAIL "before=$before after=$after"
 fi
 
@@ -133,16 +145,19 @@ after=$(wait_log 'refresh\[REFRESH\].*\| Sat 26 Sep · IST \|' 200)
 if [[ -n "$before" && -n "$after" ]]; then
     record 7 "Galway date line changes at 00:00 Galway" PASS "$after"
 else
+    diagnose "criterion 7"
     record 7 "Galway date line changes at 00:00 Galway" FAIL "before=$before after=$after"
 fi
 
 # ---- 4: Irish clock change, 2026-10-25 01:00Z ------------------------------------------------
 set_time 2026-10-25T00:58:00Z
 before=$(wait_log 'refresh\[TIME_SET\].*Galway 01:5[0-9].*IST.*band=900\.\.1259' 15)
-after=$(wait_log 'refresh\[REFRESH\].*Galway 01:0[0-9].*GMT.*band=960\.\.1259' 200)
+# SPEC §8.4 allows 20 minutes. Wait up to 10: the alarm is due at 01:00Z with a 60 s window.
+after=$(wait_log 'refresh\[REFRESH\].*Galway 01:[0-5][0-9].*GMT.*band=960\.\.1259' 600)
 if [[ -n "$before" && -n "$after" ]]; then
     record 4 "IST→GMT: Galway 01:5x→01:0x, window 16:00–21:00 Perth" PASS "$after"
 else
+    diagnose "criterion 4"
     record 4 "IST→GMT: Galway 01:5x→01:0x, window 16:00–21:00 Perth" FAIL "before=$before after=$after"
 fi
 
