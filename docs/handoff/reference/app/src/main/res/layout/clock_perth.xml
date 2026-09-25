@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Minute digits for Australia/Perth. The launcher ticks this; the app never updates it.
+     Both formats are HH:mm: the design is 24-hour regardless of device setting.
+     Text size is overridden per widget size via RemoteViews.setTextViewTextSize. -->
+<TextClock xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/clock"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:format24Hour="HH:mm"
+    android:format12Hour="HH:mm"
+    android:timeZone="Australia/Perth"
+    android:textColor="#F3EFE6"
+    android:textSize="34sp"
+    android:includeFontPadding="false"
+    android:fontFamily="@font/dm_mono_regular" />
