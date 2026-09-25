@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dual clock prototype</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Instrument+Sans:wght@400;500;600&amp;family=Instrument+Serif&amp;display=swap">
+<style>
+body{margin:0;font-family:'Instrument Sans',system-ui,sans-serif;background:#F3EFE6;color:#16181D}
+a{color:#16181D}a:hover{color:#5B5F68}
+button{font-family:'Instrument Sans',system-ui,sans-serif;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; padding: 48px; display: flex; gap: 48px; background: #F3EFE6; color: #16181D; font-family: 'Instrument Sans', system-ui, sans-serif">
+<div style="width: 720px; height: 704px; flex-shrink: 0; border-radius: 28px; background: #55606E; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px">
+<div style="width: 640px; height: 320px; box-sizing: border-box; padding: 28px 32px 24px; border-radius: 40px; background: #16181D; color: #F3EFE6; display: flex; flex-direction: column; justify-content: space-between">
+<div style="display: flex; gap: 24px">
+<div style="flex-grow: 1; flex-basis: 0; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; letter-spacing: 0.12em; color: #A3A7AF"><span style="width: 10px; height: 10px; border-radius: 5px; background: {{a.color}}"></span><span>{{a.label}}</span></div>
+<div style="font-family: 'DM Mono', monospace; font-size: 76px; line-height: 1; letter-spacing: -0.03em">{{a.time}}</div>
+<div style="font-size: 15px; color: #A3A7AF">{{a.sub}}</div>
+</div>
+<div style="flex-grow: 1; flex-basis: 0; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; letter-spacing: 0.12em; color: #A3A7AF"><span style="width: 10px; height: 10px; border-radius: 5px; background: {{b.color}}"></span><span>{{b.label}}</span></div>
+<div style="font-family: 'DM Mono', monospace; font-size: 76px; line-height: 1; letter-spacing: -0.03em">{{b.time}}</div>
+<div style="font-size: 15px; color: #A3A7AF">{{b.sub}}</div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); font-family: 'DM Mono', monospace; font-size: 12px; color: {{a.color}}">
+<sc-for list="{{ticksA}}" as="t" hint-placeholder-count="8"><span>{{t.label}}</span></sc-for>
+</div>
+<div style="position: relative; height: 20px; border-radius: 10px; background: #2A2E36">
+<div style="position: absolute; top: 0; bottom: 0; left: {{winLeft}}; width: {{winWidth}}; border-radius: 10px; background: #5E8C6A"></div>
+<div style="position: absolute; top: -6px; bottom: -6px; left: {{nowLeft}}; width: 3px; margin-left: -1px; border-radius: 2px; background: #FFFFFF"></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); font-family: 'DM Mono', monospace; font-size: 12px; color: {{b.color}}">
+<sc-for list="{{ticksB}}" as="t" hint-placeholder-count="8"><span>{{t.label}}</span></sc-for>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="width: 10px; height: 10px; border-radius: 5px; background: {{statusDot}}"></span>
+<span style="font-size: 17px; font-weight: 600">{{statusText}}</span>
+<span style="margin-left: auto; font-size: 15px; color: #A3A7AF">{{statusSub}}</span>
+</div>
+</div>
+<div style="font-size: 14px; color: #E4E7EC">Medium · 4×2 cells · shown at 2×</div>
+</div>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 28px; min-width: 0">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.12em; color: #5B5F68">HOME-SCREEN WIDGET · JETPACK GLANCE</div>
+<h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 52px; line-height: 1">Perth ⇄ Galway</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #3A3D44">Green band: both cities between {{openLabel}} and {{closeLabel}} local time. White line: now. Clocks read the IANA zones directly, so the band moves by itself when Ireland changes its clocks.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DDD6C8">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<label for="scrub" style="font-size: 15px; font-weight: 600">Scrub time ±12 h</label>
+<span style="font-family: 'DM Mono', monospace; font-size: 13px; color: #5B5F68">{{simLabel}}</span>
+</div>
+<input id="scrub" type="range" min="-12" max="12" step="0.25" value="{{offsetH}}" onChange="{{onScrub}}" style="width: 100%; height: 28px; accent-color: #16181D">
+<div style="display: flex; gap: 10px">
+<button type="button" onClick="{{onLive}}" style="height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid #16181D; background: #16181D; color: #F3EFE6; font-size: 15px; font-weight: 500">Back to live</button>
+<button type="button" onClick="{{onJump}}" style="height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid #16181D; background: transparent; color: #16181D; font-size: 15px; font-weight: 500">{{jumpLabel}}</button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); row-gap: 14px; column-gap: 16px; font-size: 15px; line-height: 1.4">
+<div style="color: #5B5F68">Perth</div>
+<div><span style="font-family: 'DM Mono', monospace">{{perthOff}}</span> · {{perthNote}}</div>
+<div style="color: #5B5F68">Galway</div>
+<div><span style="font-family: 'DM Mono', monospace">{{galwayOff}}</span> · {{galwayNote}}</div>
+<div style="color: #5B5F68">Gap</div>
+<div>{{gapText}}</div>
+<div style="color: #5B5F68">Call window</div>
+<div>{{windowText}}</div>
+<div style="color: #5B5F68">Next change</div>
+<div>{{changeText}}<br><span style="color: #5B5F68">{{changeAfter}}</span></div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primary":{"editor":"enum","options":["Perth","Galway"],"default":"Perth","section":"Layout"},"callStart":{"editor":"int","min":0,"max":23,"default":8,"section":"Calling hours"},"callEnd":{"editor":"int","min":1,"max":24,"default":21,"section":"Calling hours"},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    this._timer = setInterval(() => this.forceUpdate(), 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this._timer);
+  }
+  zone(key) {
+    return key === 'Galway'
+      ? { key: 'Galway', tz: 'Europe/Dublin', label: 'GALWAY', color: '#86B8E6' }
+      : { key: 'Perth', tz: 'Australia/Perth', label: 'PERTH', color: '#F0A060' };
+  }
+  fmt(tz, kind) {
+    this._fmts = this._fmts || {};
+    const k = tz + '|' + kind;
+    if (!this._fmts[k]) {
+      this._fmts[k] = kind === 'num'
+        ? new Intl.DateTimeFormat('en-GB', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' })
+        : new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' });
+    }
+    return this._fmts[k];
+  }
+  parts(date, tz) {
+    const o = {};
+    this.fmt(tz, 'num').formatToParts(date).forEach((p) => { o[p.type] = p.value; });
+    return { y: +o.year, mo: +o.month, d: +o.day, h: (+o.hour) % 24, mi: +o.minute, s: +o.second };
+  }
+  offset(date, tz) {
+    const p = this.parts(date, tz);
+    const asUtc = Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s);
+    return Math.round((asUtc - Math.floor(date.getTime() / 1000) * 1000) / 60000);
+  }
+  nextChange(date, tz) {
+    this._chg = this._chg || {};
+    const key = Math.floor(date.getTime() / 60000);
+    const hit = this._chg[tz];
+    if (hit && hit.key === key) return hit.found;
+    const step = 6 * 3600000;
+    const base = this.offset(date, tz);
+    let t = date.getTime();
+    let found = null;
+    for (let i = 0; i < 800; i++) {
+      const n = t + step;
+      if (this.offset(new Date(n), tz) !== base) {
+        let lo = t, hi = n;
+        while (hi - lo > 60000) {
+          const mid = lo + Math.floor((hi - lo) / 2);
+          if (this.offset(new Date(mid), tz) === base) lo = mid; else hi = mid;
+        }
+        found = { at: new Date(hi), from: base, to: this.offset(new Date(hi), tz) };
+        break;
+      }
+      t = n;
+    }
+    this._chg[tz] = { key: key, found: found };
+    return found;
+  }
+  win(offA, offB, s, e) {
+    const dm = offA - offB;
+    return { dm: dm, lo: Math.max(s, s + dm), hi: Math.min(e, e + dm) };
+  }
+  pad(n) { return String(n).padStart(2, '0'); }
+  hm(m) {
+    const x = ((m % 1440) + 1440) % 1440;
+    return this.pad(Math.floor(x / 60)) + ':' + this.pad(x % 60);
+  }
+  dur(m) {
+    const h = Math.floor(m / 60), mm = m % 60;
+    return h > 0 ? h + 'h ' + this.pad(mm) + 'm' : mm + 'm';
+  }
+  offLabel(off) {
+    const a = Math.abs(off);
+    return 'UTC' + (off >= 0 ? '+' : '−') + this.pad(Math.floor(a / 60)) + ':' + this.pad(a % 60);
+  }
+  abbr(key, off) {
+    if (key === 'Perth') return off === 480 ? 'AWST' : this.offLabel(off);
+    return off === 60 ? 'IST' : off === 0 ? 'GMT' : this.offLabel(off);
+  }
+  zoneNote(key, off) {
+    if (key === 'Perth') return 'AWST, no daylight saving';
+    return off === 60 ? 'IST, Irish summer time' : 'GMT, Irish winter time';
+  }
+  hours(m) {
+    const h = Math.abs(m) / 60;
+    return (Number.isInteger(h) ? h : h.toFixed(1)) + ' h';
+  }
+  renderVals() {
+    const st = this.state || {};
+    const offsetH = st.offsetH || 0;
+    const extraDays = st.extraDays || 0;
+    const startH = this.props.callStart ?? 8;
+    const endH = this.props.callEnd ?? 21;
+    const primary = this.props.primary ?? 'Perth';
+    const A = this.zone(primary);
+    const B = this.zone(primary === 'Perth' ? 'Galway' : 'Perth');
+    const sim = new Date(Date.now() + offsetH * 3600000 + extraDays * 86400000);
+    const s = startH * 60, e = endH * 60;
+
+    const offA = this.offset(sim, A.tz), offB = this.offset(sim, B.tz);
+    const pA = this.parts(sim, A.tz), pB = this.parts(sim, B.tz);
+    const nowA = pA.h * 60 + pA.mi, nowB = pB.h * 60 + pB.mi;
+    const w = this.win(offA, offB, s, e);
+
+    const keyA = pA.y * 10000 + pA.mo * 100 + pA.d;
+    const keyB = pB.y * 10000 + pB.mo * 100 + pB.d;
+    const noteB = keyB < keyA ? ' · a day behind' : keyB > keyA ? ' · a day ahead' : '';
+
+    const a = { label: A.label, color: A.color, time: this.pad(pA.h) + ':' + this.pad(pA.mi), sub: this.fmt(A.tz, 'day').format(sim) + ' · ' + this.abbr(A.key, offA) };
+    const b = { label: B.label, color: B.color, time: this.pad(pB.h) + ':' + this.pad(pB.mi), sub: this.fmt(B.tz, 'day').format(sim) + ' · ' + this.abbr(B.key, offB) + noteB };
+
+    const ticksA = [], ticksB = [];
+    for (let i = 0; i < 8; i++) {
+      ticksA.push({ label: this.pad(i * 3) });
+      const bm = this.hm(i * 180 - w.dm);
+      ticksB.push({ label: bm.endsWith(':00') ? bm.slice(0, 2) : bm });
+    }
+
+    const has = w.lo < w.hi;
+    const inWin = has && nowA >= w.lo && nowA < w.hi;
+    let statusText, statusSub;
+    if (!has) {
+      statusText = 'No shared calling hours';
+      statusSub = 'Widen the hours';
+    } else if (inWin) {
+      statusText = 'Good time to call';
+      statusSub = 'Closes in ' + this.dur(w.hi - nowA);
+    } else {
+      const until = nowA < w.lo ? w.lo - nowA : 1440 - nowA + w.lo;
+      const bOut = nowB < s || nowB >= e;
+      if (bOut) statusText = (nowB < s ? 'Too early in ' : 'Too late in ') + B.key;
+      else statusText = (nowA < s ? 'Too early in ' : 'Too late in ') + A.key;
+      statusSub = 'Opens in ' + this.dur(until);
+    }
+
+    const offP = this.offset(sim, 'Australia/Perth');
+    const offG = this.offset(sim, 'Europe/Dublin');
+    const gapText = w.dm === 0 ? 'Same clock time' : B.key + ' is ' + this.hours(w.dm) + (w.dm > 0 ? ' behind ' : ' ahead of ') + A.key;
+    const windowText = has
+      ? this.hm(w.lo) + '–' + this.hm(w.hi) + ' ' + A.key + ' = ' + this.hm(w.lo - w.dm) + '–' + this.hm(w.hi - w.dm) + ' ' + B.key
+      : 'None at these hours';
+
+    const changes = [A, B]
+      .map((z) => ({ z: z, c: this.nextChange(sim, z.tz) }))
+      .filter((x) => x.c)
+      .sort((x, y) => x.c.at - y.c.at);
+    let changeText = 'None in the next 200 days', changeAfter = '';
+    if (changes.length) {
+      const ch = changes[0];
+      const after = new Date(ch.c.at.getTime() + 60000);
+      const w2 = this.win(this.offset(after, A.tz), this.offset(after, B.tz), s, e);
+      changeText = this.fmt(ch.z.tz, 'day').format(ch.c.at) + ': ' + ch.z.key + ' clocks go ' + (ch.c.to < ch.c.from ? 'back ' : 'forward ') + this.hours(ch.c.to - ch.c.from);
+      changeAfter = 'Gap becomes ' + this.hours(w2.dm) + '; window ' + (w2.lo < w2.hi ? this.hm(w2.lo) + '–' + this.hm(w2.hi) + ' ' + A.key : 'closes');
+    }
+
+    const live = offsetH === 0 && extraDays === 0;
+    const simLabel = live ? 'LIVE' : 'SIM ' + (extraDays ? '+' + extraDays + 'd ' : '') + (offsetH >= 0 ? '+' : '') + offsetH + 'h';
+
+    return {
+      a: a, b: b, ticksA: ticksA, ticksB: ticksB,
+      winLeft: (has ? w.lo / 14.4 : 0).toFixed(3) + '%',
+      winWidth: (has ? (w.hi - w.lo) / 14.4 : 0).toFixed(3) + '%',
+      nowLeft: (nowA / 14.4).toFixed(3) + '%',
+      statusText: statusText, statusSub: statusSub,
+      statusDot: inWin ? '#9FD3AE' : '#6B7079',
+      openLabel: this.pad(startH) + ':00', closeLabel: this.pad(endH % 24) + ':00',
+      perthOff: this.offLabel(offP), perthNote: this.zoneNote('Perth', offP),
+      galwayOff: this.offLabel(offG), galwayNote: this.zoneNote('Galway', offG),
+      gapText: gapText, windowText: windowText, changeText: changeText, changeAfter: changeAfter,
+      offsetH: offsetH, simLabel: simLabel,
+      jumpLabel: extraDays > 0 ? 'Back to today' : 'Jump past clock change',
+      onScrub: (ev) => this.setState({ offsetH: parseFloat(ev.target.value) }),
+      onLive: () => this.setState({ offsetH: 0, extraDays: 0 }),
+      onJump: () => {
+        if (extraDays > 0) { this.setState({ extraDays: 0 }); return; }
+        if (!changes.length) return;
+        const days = Math.ceil((changes[0].c.at.getTime() - sim.getTime()) / 86400000);
+        this.setState({ extraDays: Math.max(1, days) });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

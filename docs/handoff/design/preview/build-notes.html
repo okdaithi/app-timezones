@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Build notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Instrument+Sans:wght@400;500;600&amp;family=Instrument+Serif&amp;display=swap">
+<style>
+body{margin:0;font-family:'Instrument Sans',system-ui,sans-serif;background:#F3EFE6;color:#16181D}
+a{color:#16181D}a:hover{color:#5B5F68}
+</style>
+</head>
+<body>
+<div style="width: 1280px; height: 3000px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; gap: 56px; background: #F3EFE6; color: #16181D; font-family: 'Instrument Sans', system-ui, sans-serif">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.12em; color: #5B5F68">BUILD NOTES</div>
+<h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 52px; line-height: 1.05">Glance and time zones: what has to happen</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.5; color: #3A3D44; max-width: 880px">A Glance widget is Compose syntax over RemoteViews. It does not run continuously. Every visible change needs either a view the launcher animates itself, or an explicit update your app triggers.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 28px; border-radius: 20px; background: #FFFFFF; border: 1px solid #DDD6C8">
+<div style="font-family: 'DM Mono', monospace; font-size: 13px; color: #5B5F68">01</div>
+<h3 style="margin: 0; font-size: 22px; font-weight: 600">Zones, not offsets</h3>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A3D44">Store <span style="font-family: 'DM Mono', monospace">Australia/Perth</span> and <span style="font-family: 'DM Mono', monospace">Europe/Dublin</span>. Perth has no daylight saving. Ireland switches between IST (UTC+1) and GMT (UTC+0), so the gap is 7 h from late March to late October and 8 h the rest of the year. A hard-coded −7 is wrong about five months a year.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 28px; border-radius: 20px; background: #FFFFFF; border: 1px solid #DDD6C8">
+<div style="font-family: 'DM Mono', monospace; font-size: 13px; color: #5B5F68">02</div>
+<h3 style="margin: 0; font-size: 22px; font-weight: 600">The system ticks the clocks</h3>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A3D44">Recomposing every minute is unreliable and drains battery. Embed a <span style="font-family: 'DM Mono', monospace">TextClock</span> through <span style="font-family: 'DM Mono', monospace">AndroidRemoteViews</span>, with <span style="font-family: 'DM Mono', monospace">android:timeZone</span> set. The launcher redraws it every minute, and your app never wakes.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 28px; border-radius: 20px; background: #FFFFFF; border: 1px solid #DDD6C8">
+<div style="font-family: 'DM Mono', monospace; font-size: 13px; color: #5B5F68">03</div>
+<h3 style="margin: 0; font-size: 22px; font-weight: 600">Recompute only at edges</h3>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A3D44">The band and status change only when a window opens or closes, Ireland changes its clocks, the device's zone changes, or someone sets the clock. Schedule the next of these instead of polling.</p>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 20px">
+<h3 style="margin: 0; font-size: 24px; font-weight: 600">What updates what</h3>
+<div style="display: flex; align-items: center; gap: 20px; padding: 32px; border-radius: 20px; background: #16181D; color: #F3EFE6">
+<div style="display: flex; flex-direction: column; gap: 10px; width: 360px">
+<div style="padding: 12px 16px; border-radius: 12px; background: #2A2E36; font-size: 14px; line-height: 1.4">Window edge: 15:00 / 21:00 Perth (16:00 in Irish winter)</div>
+<div style="padding: 12px 16px; border-radius: 12px; background: #2A2E36; font-size: 14px; line-height: 1.4">Irish clock change: last Sunday of March and of October, 01:00 UTC</div>
+<div style="padding: 12px 16px; border-radius: 12px; background: #2A2E36; font-size: 14px; line-height: 1.4"><span style="font-family: 'DM Mono', monospace">TIMEZONE_CHANGED</span>: you landed in the other city</div>
+<div style="padding: 12px 16px; border-radius: 12px; background: #2A2E36; font-size: 14px; line-height: 1.4"><span style="font-family: 'DM Mono', monospace">TIME_SET</span>, <span style="font-family: 'DM Mono', monospace">BOOT_COMPLETED</span></div>
+</div>
+<svg width="56" height="24" viewBox="0 0 56 24" fill="none" stroke="#A3A7AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h50M42 4l10 8-10 8"></path></svg>
+<div style="width: 220px; padding: 20px; border-radius: 14px; border: 1px solid #5E8C6A; display: flex; flex-direction: column; gap: 6px">
+<div style="font-family: 'DM Mono', monospace; font-size: 14px; color: #9FD3AE">updateAll(context)</div>
+<div style="font-size: 13px; line-height: 1.4; color: #A3A7AF">then schedules the next edge</div>
+</div>
+<svg width="56" height="24" viewBox="0 0 56 24" fill="none" stroke="#A3A7AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h50M42 4l10 8-10 8"></path></svg>
+<div style="flex-grow: 1; padding: 20px; border-radius: 14px; background: #2A2E36; display: flex; flex-direction: column; gap: 6px">
+<div style="font-family: 'DM Mono', monospace; font-size: 14px">provideGlance → callWindow(now)</div>
+<div style="font-size: 13px; line-height: 1.4; color: #A3A7AF">Band, status and date labels recomposed</div>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 20px 32px; border-radius: 20px; border: 1px dashed #A8A08F; font-size: 15px; color: #3A3D44">
+<span style="font-family: 'DM Mono', monospace; color: #16181D">TextClock × 2</span>
+<span>Separate lane: the minute digits tick in the launcher process. No broadcast, alarm or recomposition involved.</span>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: 280px minmax(0, 1fr); column-gap: 40px; row-gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h3 style="margin: 0; font-size: 20px; font-weight: 600">1 · The window</h3>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A3D44">Both cities must be between 08:00 and 21:00. Shift Galway's hours onto Perth's clock by the live gap, then intersect. Derive the gap from ZoneRules for the instant, never from a constant.</p>
+</div>
+<pre style="margin: 0; padding: 24px 28px; border-radius: 16px; background: #16181D; color: #E8E4DA; font-family: 'DM Mono', monospace; font-size: 13.5px; line-height: 1.65; white-space: pre; overflow: hidden">val PERTH: ZoneId = ZoneId.of("Australia/Perth")
+val GALWAY: ZoneId = ZoneId.of("Europe/Dublin")
+
+/** Callable minutes-of-day on Perth's clock; null if the cities never overlap. */
+fun callWindow(at: Instant, openHour: Int = 8, closeHour: Int = 21): IntRange? {
+    val gap = (PERTH.rules.getOffset(at).totalSeconds -
+               GALWAY.rules.getOffset(at).totalSeconds) / 60   // 420 (IST) or 480 (GMT)
+    val start = maxOf(openHour * 60, openHour * 60 + gap)
+    val end = minOf(closeHour * 60, closeHour * 60 + gap)
+    return if (start &lt; end) start until end else null
+}
+// IST: 900 until 1260  →  15:00–21:00 Perth = 08:00–14:00 Galway
+// GMT: 960 until 1260  →  16:00–21:00 Perth = 08:00–13:00 Galway</pre>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h3 style="margin: 0; font-size: 20px; font-weight: 600">2 · The widget</h3>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A3D44">Responsive sizes map to the three layouts on the sizes board. Read Instant.now() inside the composition so every update recomputes from scratch. Never read ZoneId.systemDefault(): it changes when you fly.</p>
+</div>
+<pre style="margin: 0; padding: 24px 28px; border-radius: 16px; background: #16181D; color: #E8E4DA; font-family: 'DM Mono', monospace; font-size: 13.5px; line-height: 1.65; white-space: pre; overflow: hidden">class DualClockWidget : GlanceAppWidget() {
+
+    companion object {
+        val SMALL = DpSize(110.dp, 110.dp)
+        val WIDE = DpSize(250.dp, 60.dp)
+        val MEDIUM = DpSize(250.dp, 110.dp)
+    }
+
+    override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE, MEDIUM))
+
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        provideContent {
+            val now = Instant.now()
+            val window = callWindow(now)
+            when (LocalSize.current) {
+                SMALL -&gt; SmallLayout(now, window)
+                WIDE -&gt; WideLayout(now, window)
+                else -&gt; MediumLayout(now, window)
+            }
+        }
+    }
+}
+
+@Composable
+fun ZoneClock(@LayoutRes layout: Int) {
+    val context = LocalContext.current
+    AndroidRemoteViews(RemoteViews(context.packageName, layout))
+}
+
+class DualClockReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = DualClockWidget()
+}</pre>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h3 style="margin: 0; font-size: 20px; font-weight: 600">3 · Ticking digits</h3>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A3D44">One layout per zone. TextClock resolves the IANA zone itself, including Ireland's clock changes. clock_galway.xml is identical with Europe/Dublin.</p>
+</div>
+<pre style="margin: 0; padding: 24px 28px; border-radius: 16px; background: #16181D; color: #E8E4DA; font-family: 'DM Mono', monospace; font-size: 13.5px; line-height: 1.65; white-space: pre; overflow: hidden">&lt;!-- res/layout/clock_perth.xml --&gt;
+&lt;TextClock xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/clock_perth"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:format24Hour="HH:mm"
+    android:format12Hour="h:mm"
+    android:timeZone="Australia/Perth"
+    android:fontFamily="monospace"
+    android:textSize="38sp" /&gt;</pre>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h3 style="margin: 0; font-size: 20px; font-weight: 600">4 · Scheduling the next edge</h3>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A3D44">One receiver handles the alarm and the system broadcasts. TIMEZONE_CHANGED and TIME_SET are exempt from Android 8's implicit-broadcast limits, so the manifest can declare them. An inexact alarm is enough. A band that flips a minute late is invisible, and exact alarms need the SCHEDULE_EXACT_ALARM permission.</p>
+</div>
+<pre style="margin: 0; padding: 24px 28px; border-radius: 16px; background: #16181D; color: #E8E4DA; font-family: 'DM Mono', monospace; font-size: 13.5px; line-height: 1.65; white-space: pre; overflow: hidden">class BandRefresh : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                DualClockWidget().updateAll(context)
+                scheduleNext(context)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+}
+
+fun scheduleNext(context: Context) {
+    val now = Instant.now()
+    val next = listOfNotNull(
+        nextWindowEdge(now),                         // next start or end of callWindow, as an Instant
+        GALWAY.rules.nextTransition(now)?.instant    // Perth has none
+    ).min()
+    val pi = PendingIntent.getBroadcast(
+        context, 0, Intent(context, BandRefresh::class.java),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+    context.getSystemService(AlarmManager::class.java)
+        .setWindow(AlarmManager.RTC, next.toEpochMilli(), 60_000L, pi)
+}
+
+&lt;!-- AndroidManifest.xml --&gt;
+&lt;uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" /&gt;
+&lt;receiver android:name=".BandRefresh" android:exported="true"&gt;
+    &lt;intent-filter&gt;
+        &lt;action android:name="android.intent.action.TIMEZONE_CHANGED" /&gt;
+        &lt;action android:name="android.intent.action.TIME_SET" /&gt;
+        &lt;action android:name="android.intent.action.BOOT_COMPLETED" /&gt;
+    &lt;/intent-filter&gt;
+&lt;/receiver&gt;</pre>
+</div>
+<div style="display: flex; flex-direction: column; gap: 16px">
+<h3 style="margin: 0; font-size: 24px; font-weight: 600">Pitfalls</h3>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<div style="padding: 22px 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DDD6C8; font-size: 15px; line-height: 1.55; color: #3A3D44"><strong style="color: #16181D">The device zone is not a widget zone.</strong> A person who lives in both cities changes systemDefault() twice a trip. The widget reads only its two fixed ZoneIds. The broadcast only triggers a refresh.</div>
+<div style="padding: 22px 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DDD6C8; font-size: 15px; line-height: 1.55; color: #3A3D44"><strong style="color: #16181D">Dates are per zone.</strong> Before about 07:00–08:00 Perth time, Galway is still on the previous day. Format each date with its own zone. Never subtract hours from a Perth LocalDate.</div>
+<div style="padding: 22px 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DDD6C8; font-size: 15px; line-height: 1.55; color: #3A3D44"><strong style="color: #16181D">Alarms die on reboot.</strong> Reschedule on BOOT_COMPLETED and in the receiver's onUpdate. Otherwise the band freezes until the next zone or time broadcast.</div>
+<div style="padding: 22px 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DDD6C8; font-size: 15px; line-height: 1.55; color: #3A3D44"><strong style="color: #16181D">Rules change.</strong> tzdata ships with OS updates. Compute from ZoneRules at each update and never persist an offset. The window then stays correct if Ireland ever changes its daylight-saving policy.</div>
+</div>
+</div>
+</div>
+</body>
+</html>

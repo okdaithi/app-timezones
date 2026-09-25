@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- docs/handoff/design/tokens.json -->
+    <color name="app_background">#F3EFE6</color>
+    <color name="widget_surface">#16181D</color>
+    <color name="widget_text">#F3EFE6</color>
+    <color name="widget_text_muted">#A3A7AF</color>
+    <color name="city_perth">#F0A060</color>
+    <color name="city_galway">#86B8E6</color>
+</resources>

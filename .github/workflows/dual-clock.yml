@@ -1,0 +1,85 @@
+name: dual-clock
+
+on:
+  push:
+    paths: ["dual-clock/**", ".github/workflows/dual-clock.yml"]
+  pull_request:
+    paths: ["dual-clock/**", ".github/workflows/dual-clock.yml"]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: dual-clock
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Forbidden-API guard (SPEC §6, acceptance 11)
+        run: scripts/check-forbidden-apis.sh
+
+      - name: Core unit tests (acceptance 1)
+        run: ./gradlew :core:test
+
+      - name: Assemble app and instrumentation APKs
+        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-test-reports
+          path: dual-clock/core/build/reports/tests/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apks
+          path: |
+            dual-clock/app/build/outputs/apk/debug/app-debug.apk
+            dual-clock/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+  emulator:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apks
+          path: dual-clock/apks
+      - name: Enable KVM
+        working-directory: .
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Acceptance checks on API 34 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          working-directory: dual-clock
+          # The runner executes each line separately, so the logic lives in one script.
+          script: |
+            adb install -r apks/debug/app-debug.apk && adb install -r apks/androidTest/debug/app-debug-androidTest.apk
+            bash scripts/emulator-checks.sh emulator-results.md
+
+      - name: Publish results
+        if: always()
+        run: |
+          [ -f emulator-results.md ] && cat emulator-results.md >> "$GITHUB_STEP_SUMMARY" || echo "no results" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-results
+          path: dual-clock/emulator-results.md

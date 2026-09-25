@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The only permission (SPEC §6): re-arm the refresh alarm after a reboot. No network. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.DualClock">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".widget.DualClockReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dual_clock_info" />
+        </receiver>
+
+        <!--
+            Why exported="true" is safe here: TIMEZONE_CHANGED, TIME_SET, BOOT_COMPLETED and
+            MY_PACKAGE_REPLACED are protected broadcasts. Only the system can send them, and they
+            are exempt from the Android 8+ implicit-broadcast limits, so the manifest may declare
+            them. Our own alarm reaches this receiver through an explicit, immutable PendingIntent.
+            Any app could still send ACTION_REFRESH explicitly, but the worst it can do is trigger
+            an idempotent redraw. No data is read from the intent.
+        -->
+        <receiver
+            android:name=".widget.BandRefresh"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

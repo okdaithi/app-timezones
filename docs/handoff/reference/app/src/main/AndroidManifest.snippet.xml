@@ -1,0 +1,31 @@
+<!-- Merge into app/src/main/AndroidManifest.xml -->
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+<application ...>
+    <activity android:name=".MainActivity" android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+    </activity>
+
+    <receiver android:name=".widget.DualClockReceiver" android:exported="true">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data android:name="android.appwidget.provider"
+            android:resource="@xml/dual_clock_info" />
+    </receiver>
+
+    <!-- System broadcasts below are exempt from Android 8+ implicit-broadcast limits.
+         exported=true is required to receive them; they are protected broadcasts only the system can send.
+         Our own alarm uses an explicit intent with ACTION_REFRESH. -->
+    <receiver android:name=".widget.BandRefresh" android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            <action android:name="android.intent.action.TIME_SET" />
+            <action android:name="android.intent.action.BOOT_COMPLETED" />
+            <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        </intent-filter>
+    </receiver>
+</application>
