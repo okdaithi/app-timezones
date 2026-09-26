@@ -8,6 +8,10 @@ This covers sideloading the Android app and adding its home-screen widget. The a
 
 Pick one of these.
 
+### Recommended: the latest release
+
+Download **https://github.com/okdaithi/app-timezones/releases/latest/download/dual-clock.apk** on the phone. This link always points to the newest signed release, and releases install over each other without uninstalling. It starts working when v1.0.0 is published. Until then, use A or B.
+
 ### A. Download from GitHub Actions (no tools needed)
 
 1. Sign in to GitHub. Artifacts are only visible to signed-in users with access to the repository.
