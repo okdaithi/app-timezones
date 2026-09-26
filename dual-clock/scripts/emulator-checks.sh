@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 # Automates the SPEC §8 acceptance criteria that can be observed from adb on an emulator.
-# Expects a booted emulator with the debug APK and the androidTest APK installed.
+# Expects a booted emulator. Installs the APKs itself from the CI "apks" artifact layout:
+#   <apks>/debug/app-debug.apk                       the build under test
+#   <apks>/androidTest/debug/app-debug-androidTest.apk
+#   <apks>/previous/app-debug.apk                    optional: the base commit's build, same key
+# With a previous build, the new one is installed over it (upgrade test) before anything else.
 # Observations come from the one-line "DualClock" log that refreshAll writes, plus dumpsys alarm.
 # Criteria that need eyes on a launcher (2, 8, 9) are reported as MANUAL; see VERIFICATION.md.
 #
-# Usage: scripts/emulator-checks.sh [results.md]
+# Usage: scripts/emulator-checks.sh [results.md] [apks-dir]
 set -uo pipefail
 
 PKG=com.dg.dualclock
 RUNNER="$PKG.test/androidx.test.runner.AndroidJUnitRunner"
 OUT="${1:-emulator-results.md}"
+APKS="${2:-apks}"
+NEW_APK="$APKS/debug/app-debug.apk"
+TEST_APK="$APKS/androidTest/debug/app-debug-androidTest.apk"
+PREV_APK="$APKS/previous/app-debug.apk"
 FAILED=0
 
 echo "| # | Criterion | Result | Evidence |" > "$OUT"
@@ -75,10 +83,40 @@ adbsh settings put global auto_time 0
 adbsh settings put global auto_time_zone 0
 adbsh svc power stayon true
 adbsh input keyevent KEYCODE_WAKEUP
-adbsh appwidget grantbind --package "$PKG" --user 0
 
+instrument() { adb shell am instrument -w -e class "$PKG.WidgetHostTest#$1" "$RUNNER" | tr -d '\r'; }
+version_code() { adbsh dumpsys package "$PKG" | sed -nE 's/.*versionCode=([0-9]+).*/\1/p' | head -1; }
+
+# ---- U: update in place keeps settings and the placed widget --------------------------------
+# Previous build (base commit) and this build are signed by the same key on the same runner,
+# as release builds will be. Install old, place the widget, change settings, then `install -r`.
+if [[ -f "$PREV_APK" ]]; then
+    adb install -r "$PREV_APK" >/dev/null && adb install -r "$TEST_APK" >/dev/null
+    adbsh appwidget grantbind --package "$PKG" --user 0
+    old_vc=$(version_code)
+    pre="$(instrument placeWidget)$(instrument saveSettingsBeforeUpgrade)"
+    adb logcat -c
+    inst=$(adb install -r "$NEW_APK" 2>&1 | tr -d '\r')
+    new_vc=$(version_code)
+    # Primary is Galway after the settings change, so the description starts with Galway.
+    replaced=$(wait_log 'refresh\[MY_PACKAGE_REPLACED\].*Galway [0-9]{2}:[0-9]{2}, Perth' 30)
+    kept=$(instrument upgradeKeptState)
+    if [[ $(grep -c 'OK (1 test)' <<<"$pre") == 2 && "$inst" == *Success* && "${new_vc:-0}" -gt "${old_vc:-0}" \
+          && -n "$replaced" ]] && grep -q 'OK (1 test)' <<<"$kept"; then
+        record U "Update in place (versionCode $old_vc→$new_vc) keeps settings and widget" PASS "$replaced"
+    else
+        echo "---- upgrade diagnostics"; echo "$pre"; echo "$inst"; echo "$kept"; log; echo "----"
+        record U "Update in place keeps settings and widget" FAIL \
+            "install=${inst:-none} vc=$old_vc→$new_vc replaced=${replaced:-none} kept=$(grep -m1 -E 'OK|FAIL|Error' <<<"$kept")"
+    fi
+else
+    adb install -r "$NEW_APK" >/dev/null && adb install -r "$TEST_APK" >/dev/null
+    record U "Update in place keeps settings and widget" SKIP "no previous build in $APKS/previous"
+fi
+
+adbsh appwidget grantbind --package "$PKG" --user 0
 adb logcat -c
-place=$(adb shell am instrument -w -e class "$PKG.WidgetHostTest#placeWidget" "$RUNNER" | tr -d '\r')
+place=$(instrument placeWidget)
 if ! grep -q 'OK (1 test)' <<<"$place"; then
     record 0 "Place widget via AppWidgetHost" FAIL "$place"
     cat "$OUT"; exit 1

@@ -1,0 +1,90 @@
+name: dual-clock-release
+
+# Publishes a signed APK as a GitHub Release when a tag like v1.2.3 is pushed.
+# Tag only commits that are already green on the dual-clock workflow (it runs the emulator checks).
+#
+# Needs (see dual-clock/RELEASING.md):
+#   secrets   SIGNING_KEYSTORE_BASE64, SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD
+#   variable  RELEASE_CERT_SHA256  the release certificate's SHA-256, lowercase hex, no colons
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: dual-clock
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      EXPECTED_CERT: ${{ vars.RELEASE_CERT_SHA256 }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check release configuration
+        env:
+          HAS_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE_BASE64 != '' }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::tag must look like v1.2.3, got $RELEASE_TAG"; exit 1; }
+          [[ "$HAS_KEYSTORE" == true ]] || { echo "::error::secret SIGNING_KEYSTORE_BASE64 is not set"; exit 1; }
+          [[ "$EXPECTED_CERT" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::variable RELEASE_CERT_SHA256 must be 64 lowercase hex chars"; exit 1; }
+
+      - name: Forbidden-API guard and core tests
+        run: |
+          scripts/check-forbidden-apis.sh
+          ./gradlew :core:test
+
+      - name: Build signed release APK
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          export SIGNING_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+          base64 -d <<<"$SIGNING_KEYSTORE_BASE64" > "$SIGNING_KEYSTORE_PATH"
+          ./gradlew :app:assembleRelease
+          rm -f "$SIGNING_KEYSTORE_PATH"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/dual-clock.apk"
+
+      # Android only installs an update over an existing app if the certificate matches and the
+      # versionCode is not lower. Check both here, so a bad build never reaches users.
+      - name: Verify signature and version
+        run: |
+          bt="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          apk="$RUNNER_TEMP/dual-clock.apk"
+          cert() { "$bt/apksigner" verify --print-certs "$1" | sed -nE 's/^Signer #1 certificate SHA-256 digest: ([0-9a-f]+)$/\1/p'; }
+          vcode() { "$bt/aapt2" dump badging "$1" | sed -nE "s/^package: .* versionCode='([0-9]+)'.*/\1/p"; }
+
+          "$bt/apksigner" verify "$apk"
+          actual=$(cert "$apk"); code=$(vcode "$apk")
+          echo "certificate $actual, versionCode $code"
+          [[ "$actual" == "$EXPECTED_CERT" ]] || { echo "::error::APK signed with $actual, expected $EXPECTED_CERT"; exit 1; }
+
+          prev_tag=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
+          if [[ -n "$prev_tag" ]]; then
+            gh release download "$prev_tag" --repo "$GITHUB_REPOSITORY" --pattern dual-clock.apk --dir "$RUNNER_TEMP/prev"
+            prev_code=$(vcode "$RUNNER_TEMP/prev/dual-clock.apk"); prev_cert=$(cert "$RUNNER_TEMP/prev/dual-clock.apk")
+            echo "previous $prev_tag: certificate $prev_cert, versionCode $prev_code"
+            [[ "$prev_cert" == "$actual" ]] || { echo "::error::certificate differs from $prev_tag; users could not update"; exit 1; }
+            (( code > prev_code )) || { echo "::error::versionCode $code is not above $prev_tag's $prev_code"; exit 1; }
+          else
+            echo "no previous release; first signed release"
+          fi
+
+      - name: Publish GitHub Release
+        run: |
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/dual-clock.apk" \
+            --repo "$GITHUB_REPOSITORY" --title "Perth ⇄ Galway $RELEASE_TAG" --generate-notes --verify-tag

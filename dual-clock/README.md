@@ -14,6 +14,6 @@ scripts/check-forbidden-apis.sh      # SPEC §6 guard
 scripts/emulator-checks.sh           # SPEC §8 on a booted emulator; see VERIFICATION.md
 ```
 
-Installing on a phone: see [`INSTALL.md`](INSTALL.md).
+Installing on a phone: see [`INSTALL.md`](INSTALL.md). Cutting a signed release: see [`RELEASING.md`](RELEASING.md).
 
 Fonts: DM Mono, Instrument Sans and Instrument Serif are not bundled yet. Search for `TODO(font)`.
