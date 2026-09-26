@@ -75,7 +75,35 @@ class WidgetHostTest {
         }
     }
 
+    /**
+     * Upgrade test, step 1 (runs against the PREVIOUS app version): store non-default settings.
+     * Only calls APIs that already exist in the previous version, since this code executes
+     * inside that version's process.
+     */
+    @Test fun saveSettingsBeforeUpgrade() = runBlocking {
+        SettingsRepository(context).save(UPGRADE_SETTINGS)
+        refreshAll(context, "test-pre-upgrade")
+    }
+
+    /** Upgrade test, step 2 (runs against the NEW version): settings, widget and its state survived. */
+    @Test fun upgradeKeptState() = runBlocking {
+        val repo = SettingsRepository(context)
+        try {
+            assertEquals(UPGRADE_SETTINGS, repo.current())
+            val ids = GlanceAppWidgetManager(context).getGlanceIds(DualClockWidget::class.java)
+            assertTrue("widget lost in upgrade", ids.isNotEmpty())
+            for (id in ids) {
+                val prefs: Preferences = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
+                assertEquals("GALWAY", prefs[Keys.PRIMARY])
+            }
+        } finally {
+            repo.save(Settings())
+            refreshAll(context, "test-upgrade-restore")
+        }
+    }
+
     private companion object {
         const val HOST_ID = 4242
+        val UPGRADE_SETTINGS = Settings(openHour = 7, closeHour = 22, primary = City.GALWAY)
     }
 }

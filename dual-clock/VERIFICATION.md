@@ -19,6 +19,7 @@ Status on 2026-09-25. CI results are from [run 36142041579](https://github.com/o
 | 8 | Four sizes, no clipping at each bucket's minimum | MANUAL | See below |
 | 9 | TalkBack reads the F9 description | MANUAL | See below. CI logs the description string |
 | 10 | Settings change updates every placed widget | **PASS** (CI) | `WidgetHostTest#settingsReachEveryWidget` |
+| U | Update in place (`adb install -r`, higher `versionCode`, same key) keeps settings and the placed widget, and triggers a refresh | CI | `emulator-checks.sh` §U, `WidgetHostTest#saveSettingsBeforeUpgrade` / `#upgradeKeptState`. See `RELEASING.md` |
 | R3 | Exactly one pending alarm, `RTC` (type 1), never `RTC_WAKEUP` | **PASS** (CI) | `dumpsys alarm`: `RTC #16: Alarm{… type 1 … com.dg.dualclock}` |
 | 11 | No `systemDefault`/`getDefault()`/zone-less `now` outside tests | **PASS** (local + CI) | `scripts/check-forbidden-apis.sh`, which also checks R3 (no exact or wake-up alarms, no WorkManager, `updatePeriodMillis=0`) and the permission list |
 
